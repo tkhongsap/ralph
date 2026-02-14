@@ -11,3 +11,7 @@ progress.txt
 
 #Claude
 .claude/
+
+# Dashboard build artifacts
+ui/raw-data-dashboard/node_modules/
+ui/raw-data-dashboard/dist/
