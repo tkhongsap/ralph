@@ -1,0 +1,116 @@
+{
+  "project": "rag-mmm-platform",
+  "branchName": "ralph/ms2-rag-pipeline-ingest-embed-retrieve",
+  "description": "MS-2 — RAG Pipeline: Ingest, Embed, Retrieve. Deliver production-capable RAG retrieval foundation for text and assets with persistent Qdrant indexes, BM25 hybrid retrieval, and CLI tooling.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Verify deps + add QDRANT_PATH config",
+      "description": "As a devops operator, I want Qdrant and embedding dependencies installed and configurable so that indexing can run in different runtime environments.",
+      "acceptanceCriteria": [
+        "requirements.txt already contains: llama-index-retrievers-bm25, qdrant-client, llama-index-vector-stores-qdrant (verify these are present)",
+        ".env.example documents optional QDRANT_PATH with default value data/qdrant_db",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Bug fix: rank-bm25 is incorrect — the correct LlamaIndex BM25 integration is llama-index-retrievers-bm25"
+    },
+    {
+      "id": "US-002",
+      "title": "Create RAGIndexer with text Qdrant collection",
+      "description": "As a platform engineer, I want documents indexed into Qdrant so that text retrieval is fast and repeatable.",
+      "acceptanceCriteria": [
+        "src/rag/embeddings/indexer.py exists with RAGIndexer class",
+        "RAGIndexer loads documents via load_all_text_documents() from src/rag/data_processing/ingest.py",
+        "RAGIndexer creates text_documents collection under QDRANT_PATH with vectors from OpenAIEmbedding(model='text-embedding-3-small')",
+        "Documents passed directly to VectorStoreIndex without additional splitting (ingest.py handles pre-chunking)",
+        "Running indexing twice on same corpus replaces vectors deterministically without duplicates",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Bug fix: SentenceSplitter conflicts with ingest.py pre-chunking (20 rows/doc for CSVs). Pass docs directly to VectorStoreIndex."
+    },
+    {
+      "id": "US-003",
+      "title": "Add BM25 build/load to RAGIndexer",
+      "description": "As a retrieval engineer, I want BM25 indexes built and persisted so that hybrid lexical + dense retrieval works.",
+      "acceptanceCriteria": [
+        "RAGIndexer builds BM25 index from same document corpus",
+        "BM25 artifacts persisted under data/index/bm25/ directory",
+        "data/index/bm25/ is non-empty after indexing",
+        "RAGIndexer can load persisted BM25 without rebuilding on second call",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add campaign_assets collection to RAGIndexer",
+      "description": "As a campaign analyst, I want asset descriptions indexed in Qdrant so that asset search is available alongside text search.",
+      "acceptanceCriteria": [
+        "RAGIndexer loads campaign assets from asset manifest metadata",
+        "RAGIndexer creates campaign_assets collection under QDRANT_PATH with same embedding model",
+        "campaign_assets collection contains >0 vectors after indexing",
+        "Asset metadata includes image_path field for later retrieval",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create query_engine.py with search_text()",
+      "description": "As a query consumer, I want hybrid text search combining dense and lexical signals so relevance is strong for both semantic and keyword-heavy questions.",
+      "acceptanceCriteria": [
+        "src/rag/retrieval/query_engine.py exists with search_text(query, top_k=5, category=None) function",
+        "search_text() uses QueryFusionRetriever over Qdrant and BM25 indexes",
+        "search_text() applies reciprocal reranking and returns ranked list of nodes",
+        "Each returned node has score, text, and metadata fields",
+        "Query 'What is Meta CPM?' returns nodes from meta_ads.csv or config metadata",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Add search_assets() + check_indexes()",
+      "description": "As a campaign analyst and operator, I want asset search and index health checks available so I can locate creatives and verify index status.",
+      "acceptanceCriteria": [
+        "search_assets(query, top_k=5, channel=None) function exists in query_engine.py",
+        "search_assets() targets campaign_assets collection and supports optional channel filter",
+        "search_assets() returns nodes with image_path metadata without crashing on unknown channels",
+        "Query 'DEEPAL S07 launch creative' returns matching creative entries with valid image_path",
+        "check_indexes() function prints collection stats (name, vector_count, status) without mutating indexes",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create build_index.py CLI",
+      "description": "As an operator, I want a CLI tool that can build indexes and verify health so I can manage indexing in production.",
+      "acceptanceCriteria": [
+        "src/rag/data_processing/build_index.py exists and is runnable as: python -m src.rag.data_processing.build_index",
+        "CLI supports --text flag to build text_documents + BM25 indexes only",
+        "CLI supports --assets flag to build campaign_assets collection only",
+        "CLI supports --check flag to print index health without mutation",
+        "Running without flags defaults to full indexing (both text and assets) or explicitly documents default in help",
+        "Module uses QDRANT_PATH and other env config from .env",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

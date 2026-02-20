@@ -1,0 +1,138 @@
+# Ralph Progress Log
+## Codebase Patterns
+- Frontend dashboard stories in this PRD are implemented under `ui/raw-data-dashboard`; run dependency installs and quality checks from that directory.
+- Keep dashboard theming centralized in `ui/raw-data-dashboard/src/styles.css` `:root` tokens and reference variables instead of hardcoded colors.
+- Skeleton loading components (SkeletonCard, SkeletonRow) and EmptyState are defined inline in App.jsx — reuse them for consistent loading/empty UX.
+- Initial loading state should be `useState(true)` (not false) so skeletons render on first paint before API responds.
+- Summary cards use `.summary-card` class (separate from `.card`); per-card accent color via `--card-accent` CSS custom property set in inline style.
+- File preview API returns `preview_rows` (array of objects) for CSVs and `content` (string) for non-CSV files; use `.preview-table` class to scope preview-specific table styles.
+- Expandable sub-rows use `React.Fragment` to pair a main `<tr>` with a conditional sub-row `<tr>`, and `stopPropagation` on the toggle to avoid triggering the parent row click.
+- Cross-file checks from the API have `check.file === null` (they come from the `cross_file_checks` YAML section without an explicit `file` key).
+- For dependency and lint workflows in this repo, activate the project virtualenv first (`source .venv/bin/activate`) because system Python may enforce PEP 668 and block global `pip install`.
+
+Started: Sat Feb 14 12:00:10 +07 2026
+---
+## 2026-02-14 12:03:12 +0700 - US-001
+- Implemented the design-system foundation for the dashboard: imported JetBrains Mono in `index.html`, rewrote `styles.css` with dark-mode CSS variables, and added base `.card`, `.pill`, and animated `.skeleton` styles.
+- Files changed: `ui/raw-data-dashboard/*` (added dashboard app baseline), `ui/raw-data-dashboard/index.html`, `ui/raw-data-dashboard/src/styles.css`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - The dashboard is a standalone Vite app; run `npm ci` once in `ui/raw-data-dashboard` before running `npm run build`.
+  - The core color/typography system now lives in `ui/raw-data-dashboard/src/styles.css` `:root`; new UI work should consume these tokens for consistent dark-mode styling.
+  - Browser automation/dev-browser tooling was not available in this environment, so manual browser verification is required.
+---
+## 2026-02-14 - US-002
+- Implemented header redesign, skeleton loading states, styled error banner, empty states, and layout container update.
+- Also fixed US-001 implementation gap: the previous iteration's CSS/HTML changes (dark-mode tokens, JetBrains Mono import) were not actually committed. Applied them here.
+- Files changed:
+  - `ui/raw-data-dashboard/index.html` — added JetBrains Mono Google Fonts import (US-001 fix)
+  - `ui/raw-data-dashboard/src/styles.css` — full rewrite: dark-mode CSS custom properties, skeleton/empty-state/error-banner styles, header border, max-width 1400px (US-001 + US-002)
+  - `ui/raw-data-dashboard/src/App.jsx` — added SkeletonCard, SkeletonRow, EmptyState components; error-banner div; loading state defaults to true; conditional rendering for loading/empty/error
+  - `ralph/prd.json` — marked US-002 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - Previous iteration marked US-001 as passing but the code changes were never committed. Always verify git status before trusting progress.txt claims.
+  - The `loading` state should default to `true` (not `false`) so that skeleton placeholders appear immediately on first render before the API call resolves.
+  - The error banner uses `className="error-banner"` (not just "error") for the styled version with --fail-bg background.
+  - Skeleton rows for tables use flexbox layout (`.skeleton-row`) rather than `<tr>` elements, since they sit outside the real `<table>` structure.
+  - The `margin-top: 14px` on `.card` affects summary cards in `.summary-grid`; summary-grid has `margin-top: 0` to avoid double spacing after the header.
+---
+## 2026-02-14 - US-003
+- Redesigned SummaryCard component with left accent bar, per-card accent colors, JetBrains Mono for values, and responsive 4→2→1 column grid.
+- Files changed:
+  - `ui/raw-data-dashboard/src/App.jsx` — replaced SummaryCard with accent-bar variant; each card instance now passes an `accent` prop for color differentiation
+  - `ui/raw-data-dashboard/src/styles.css` — added `.summary-card`, `.summary-card-accent`, `.summary-card-content` styles; responsive grid breakpoints at 1100px (2-col) and 768px (1-col); hover state with border-color highlight; JetBrains Mono on `.value`
+  - `ralph/prd.json` — marked US-003 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - Summary cards now use `.summary-card` class (not `.card`) to separate their styles from the generic card used by table sections. This avoids margin/padding conflicts.
+  - Per-card accent color is set via CSS custom property `--card-accent` through inline style — this pattern allows each card to have a unique accent without extra CSS classes.
+  - The responsive grid uses explicit `repeat(4, 1fr)` instead of `auto-fit minmax()` for more predictable column behavior at defined breakpoints.
+---
+## 2026-02-14 - US-004
+- Redesigned file inventory table with zebra-striped alternating rows, monospace file names, and muted n/a styling for non-CSV files.
+- Files changed:
+  - `ui/raw-data-dashboard/src/styles.css` — added zebra striping via `tbody tr:nth-child(even)`, `.file-name` monospace class, `.na-value` muted italic class, row transition, selected+even override
+  - `ui/raw-data-dashboard/src/App.jsx` — added `className="file-name"` to file name td, wrapped non-CSV n/a values in `<span className="na-value">`, used `file.is_csv` to conditionally show numeric rows/columns vs n/a
+  - `ralph/prd.json` — marked US-004 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - Most dark-mode table styling (header, borders, hover, selected) was already in place from US-001/US-002. US-004 only needed incremental additions: zebra striping, monospace file names, and muted n/a.
+  - Zebra striping uses `rgba(51, 65, 85, 0.3)` (semi-transparent --bg-card-hover) rather than a solid color, so it layers well with hover/selected states.
+  - When using `nth-child(even)` with `.selected`, the selected style needs an override for even rows to prevent the zebra color showing through.
+  - Non-CSV rows use `file.is_csv` to decide between showing numeric values or styled n/a — this is more explicit than checking for `null`/`undefined` via `??`.
+---
+## 2026-02-14 - US-005
+- Redesigned PRD conformance table with consistent dark-mode styling, improved status pills with min-width alignment, monospace font on File/Observed/Expected columns, truncation with hover-expand on Observed/Expected pre blocks, and fail-row background tinting.
+- Files changed:
+  - `ui/raw-data-dashboard/src/styles.css` — added `.pill` min-width for alignment, `.checks-table` scoped styles for file-name monospace, `.check-value` truncation with ellipsis + hover expand, `.fail-row` background tinting with --fail-bg, cursor default for non-clickable conformance rows
+  - `ui/raw-data-dashboard/src/App.jsx` — added `className="checks-table"` to table, `className="fail-row"` conditionally on fail status rows, `className="file-name"` on file td, `className="check-value"` with `title` attribute on Observed/Expected tds
+  - `ralph/prd.json` — marked US-005 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - Most dark-mode table styling was already in place from US-001/US-002/US-004. US-005 only needed incremental additions scoped to `.checks-table` class to avoid affecting the file inventory table.
+  - Status pills already had the correct rounded-badge styling from US-001; adding `min-width: 56px` and `text-align: center` aligns them visually when different statuses have different text lengths (PASS vs FAIL vs WARN).
+  - For long pre-formatted content in table cells, use `text-overflow: ellipsis` with `white-space: nowrap` + `overflow: hidden`, and switch to `pre-wrap` on hover for expansion. Add `title` attribute as fallback for tooltip.
+  - Scoping styles with a table-level class (`.checks-table`) keeps conformance-specific styles separate from the file inventory table styles.
+  - The conformance table rows are not clickable (unlike file inventory rows), so set `cursor: default` on `.checks-table tbody tr:not(.fail-row)`.
+---
+## 2026-02-14 - US-006
+- Redesigned file preview panel with dark-mode styling, CSV data rendered as a formatted table (not raw JSON), monospace font, skeleton loading animation, styled error state, and centered empty state.
+- Files changed:
+  - `ui/raw-data-dashboard/src/App.jsx` — replaced plain text preview with: skeleton loading lines, styled error banner, formatted CSV table with headers from preview_rows keys, preformatted text fallback for non-CSV content, centered empty state icon
+  - `ui/raw-data-dashboard/src/styles.css` — added `.preview-panel`, `.preview-header`, `.preview-loading`, `.skeleton-preview-line`, `.preview-error`, `.preview-code-block`, `.preview-table` styles with dark background code block, monospace font, and hover highlighting
+  - `ralph/prd.json` — marked US-006 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - The API returns `preview_rows` (array of objects) for CSV files and `content` (string) for non-CSV files (e.g., markdown contracts). Check both fields when rendering preview.
+  - The preview table uses `.preview-table` class to scope styles separately from the main data tables — this avoids inheriting cursor, hover, and selection styles from the file inventory table.
+  - The code block uses `rgba(15, 23, 42, 0.6)` for a subtly darker background than `--bg-card`, creating visual depth for the code area.
+  - Skeleton loading lines for preview use varying widths (100%, 85%, 70%, 90%, 60%) via inline styles for a more natural loading appearance.
+---
+## 2026-02-14 - US-007
+- Implemented check filter buttons (All/Pass/Warn/Fail) with count badges above the PRD Conformance table. Selecting a filter immediately filters the displayed checks; active filter is highlighted with status-specific accent color.
+- Files changed:
+  - `ui/raw-data-dashboard/src/App.jsx` — added `checkFilter` state, `filteredChecks` useMemo, filter button bar in `.checks-header` div, empty state for filtered results, switched `checks.map` to `filteredChecks.map`
+  - `ui/raw-data-dashboard/src/styles.css` — added `.checks-header`, `.check-filters`, `.check-filter-btn` (with `.active` and status-specific active variants), `.check-filter-count` badge styles
+  - `ralph/prd.json` — marked US-007 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - The pass/warn/fail counts are already computed as `passing`, `warn`, `fail` variables from useMemo hooks — reuse them directly for filter badge counts instead of recomputing.
+  - Filter buttons use status-specific active styling (e.g., `.check-filter-pass.active` uses `--pass-bg`/`--pass`) for visual consistency with the existing pill color scheme.
+  - When adding a filtered empty state, check for both "no data at all" (`checks.length === 0`) and "no matches for current filter" (`filteredChecks.length === 0`) as separate conditions.
+---
+## 2026-02-14 - US-008
+- Implemented expandable column profiles in the file inventory table. CSV rows now have an expand/collapse chevron that reveals a nested sub-table showing column-level profiles (Column Name, Dtype, Null Count, Null %, Distinct, Min, Max, Sample Values).
+- Files changed:
+  - `ui/raw-data-dashboard/src/App.jsx` — added `expandedFiles` state (Set), `toggleExpand` handler with `stopPropagation`, expand chevron column in file table header/rows, `React.Fragment` wrapper for row+sub-row pairs, `.profiles-row` with nested `.profiles-table` rendering `column_profiles` data
+  - `ui/raw-data-dashboard/src/styles.css` — added `.expand-cell`, `.expand-toggle` (with rotation on `.expanded`), `.profiles-row`, `.profiles-wrap`, `.profiles-table` (scoped th/td/hover/zebra), `.profile-value` truncation styles
+  - `ralph/prd.json` — marked US-008 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - When adding an expand/collapse toggle inside a clickable table row, use `e.stopPropagation()` on the button handler to prevent the row click (file selection) from firing.
+  - Use `React.Fragment` (with explicit `import React`) to wrap the main row + expandable sub-row pair, since `<tbody>` only accepts `<tr>` as direct children.
+  - The expand chevron uses a unicode right-pointing triangle (&#9654;) rotated 90° via CSS `transform: rotate(90deg)` for the expanded state — simple and dependency-free.
+  - The profiles sub-table uses `colSpan={8}` (matching the 8 columns: expand + 7 data columns) to span the full row width, with left padding (`padding-left: 48px`) in `.profiles-wrap` to visually indent under the parent row.
+  - Multiple rows can be expanded simultaneously since `expandedFiles` is a `Set`.
+---
+## 2026-02-14 - US-009
+- Implemented row-count selector dropdown in the file preview panel header (options: 10, 20, 50, 100; default 20) and cross-file badge on PRD conformance checks that span multiple files.
+- Files changed:
+  - `ui/raw-data-dashboard/src/App.jsx` — added `previewRows` state, wired to `getFilePreview` call with `previewRows` in dependency array, added `<select>` dropdown in preview header, added cross-file badge (`<span className="cross-file-badge">`) next to check title when `!check.file`
+  - `ui/raw-data-dashboard/src/styles.css` — added `.row-count-label`, `.row-count-select` (with hover/focus accent border), `.cross-file-badge` (muted rounded pill) styles
+  - `ralph/prd.json` — marked US-009 passes: true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations:**
+  - Cross-file checks in the API response are identified by `check.file` being `null`/falsy — they come from the `cross_file_checks` section in `dashboard_checks.yml` and don't have a `file` property set by `evaluate_rules()` (line 617-618 in `data_profiles.py`).
+  - The `getFilePreview()` API function in `api.js` already accepts a `rows` parameter — just wire the state through.
+  - When adding `previewRows` to the useEffect dependency array, changing the dropdown triggers a fresh API call automatically — no manual refetch needed.
+  - The `<select>` styling requires explicit `background`, `color`, and `option` styling for dark-mode consistency; browser default select styling doesn't inherit CSS custom properties.
+---
+## 2026-02-20 09:58:07 +0700 - US-001
+- Implemented missing dependency declarations in `requirements.txt`: `Pillow>=10.0.0`, `qdrant-client>=1.9.0`, and `llama-index-vector-stores-qdrant>=0.3.0`.
+- Ran quality checks: `source .venv/bin/activate && pip install -r requirements.txt` (successful) and `source .venv/bin/activate && make lint` (pass).
+- Files changed: `requirements.txt`, `CLAUDE.md`, `ralph/prd.json`, `ralph/progress.txt`.
+- **Learnings for future iterations:**
+  - This environment blocks system-level `pip install` via PEP 668; run installs through the repo virtualenv.
+  - Adding LlamaIndex integrations can trigger long dependency backtracking; allow `pip` resolver to complete before assuming failure.
+  - For this story scope, `make lint` is the required project quality gate and currently runs py_compile checks for `src/rag/__init__.py` and `src/mmm/__init__.py`.
+---

@@ -2,14 +2,11 @@
 ## Codebase Patterns
 - Frontend dashboard stories in this PRD are implemented under `ui/raw-data-dashboard`; run dependency installs and quality checks from that directory.
 - Keep dashboard theming centralized in `ui/raw-data-dashboard/src/styles.css` `:root` tokens and reference variables instead of hardcoded colors.
+- For dependency and lint workflows in this repo, activate the project virtualenv first (`source .venv/bin/activate`) because system Python may enforce PEP 668 and block global `pip install`.
+- RAG indexer: Do NOT apply SentenceSplitter to pre-chunked docs — ingest.py handles chunking (20 rows/doc for CSVs). Pass docs directly to VectorStoreIndex.
+- BM25 integration: Use `llama-index-retrievers-bm25` (LlamaIndex wrapper), NOT `rank-bm25` (raw library).
+- Hybrid retrieval: QueryFusionRetriever + reciprocal reranking over Qdrant vector + BM25 retrievers.
+- All modules run from project root (`python -m src.rag.data_processing.run`, not relative imports).
 
-Started: Sat Feb 14 12:00:10 +07 2026
----
-## 2026-02-14 12:03:12 +0700 - US-001
-- Implemented the design-system foundation for the dashboard: imported JetBrains Mono in `index.html`, rewrote `styles.css` with dark-mode CSS variables, and added base `.card`, `.pill`, and animated `.skeleton` styles.
-- Files changed: `ui/raw-data-dashboard/*` (added dashboard app baseline), `ui/raw-data-dashboard/index.html`, `ui/raw-data-dashboard/src/styles.css`, `prd.json`, `progress.txt`
-- **Learnings for future iterations:**
-  - The dashboard is a standalone Vite app; run `npm ci` once in `ui/raw-data-dashboard` before running `npm run build`.
-  - The core color/typography system now lives in `ui/raw-data-dashboard/src/styles.css` `:root`; new UI work should consume these tokens for consistent dark-mode styling.
-  - Browser automation/dev-browser tooling was not available in this environment, so manual browser verification is required.
+Started: Thu Feb 20 2026
 ---

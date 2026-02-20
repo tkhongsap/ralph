@@ -1,18 +1,18 @@
 {
   "project": "rag-mmm-platform",
-  "branchName": "ralph/ms1-synthetic-data-foundation",
-  "description": "MS-1 Synthetic Data & Mock Assets Foundation - Close 4 remaining gaps so generate_all.py runs cleanly end-to-end",
+  "branchName": "ralph/ms2-dry-run-validation",
+  "description": "MS-2 Dry-Run — Validate the RAG pipeline (parse, chunk, embed, index, retrieve) on sample files before the full production build. Build indexer.py, query_engine.py, and build_index.py, then test with 1 file per data category (~6 files, ~$0.05 estimated cost). Precursor to Issue #81.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add missing Python dependencies to requirements.txt",
-      "description": "As a developer, I need all required packages declared in requirements.txt so that a fresh pip install succeeds and the full pipeline runs.",
+      "title": "Config and environment setup",
+      "description": "As a developer, I want embedding model and Qdrant path configurable via .env so the pipeline is portable across environments.",
       "acceptanceCriteria": [
-        "Pillow>=10.0.0 added to requirements.txt (required by data/generators/assets.py:18 for PNG generation)",
-        "qdrant-client>=1.9.0 added to requirements.txt (vector store client, MS-2 prep)",
-        "llama-index-vector-stores-qdrant>=0.3.0 added to requirements.txt (LlamaIndex Qdrant integration, MS-2 prep)",
-        "pip install -r requirements.txt completes without errors",
-        "make lint passes"
+        ".env.example documents QDRANT_PATH with default data/qdrant_db",
+        ".env.example documents EMBEDDING_MODEL with default text-embedding-3-large",
+        "requirements.txt already contains llama-index-retrievers-bm25, qdrant-client, llama-index-vector-stores-qdrant — verify present, no changes needed",
+        "data/qdrant_db/ and data/index/bm25/ added to .gitignore if not already present",
+        "Typecheck passes"
       ],
       "priority": 1,
       "passes": false,
@@ -20,48 +20,102 @@
     },
     {
       "id": "US-002",
-      "title": "Add .gitignore entries for generated assets and databases",
-      "description": "As a developer, I want generated binary files excluded from git tracking so that PNGs and database files don't bloat the repository.",
+      "title": "RAGIndexer — text_documents Qdrant collection",
+      "description": "As a platform engineer, I want documents indexed into a Qdrant text_documents collection so that dense vector retrieval is available.",
       "acceptanceCriteria": [
-        "data/assets/* added to .gitignore in the Data directories section",
-        "data/qdrant_db/ added to .gitignore",
-        "data/index/ added to .gitignore",
-        "Existing !data/**/.gitkeep pattern still works — .gitkeep files remain tracked",
-        "git status does not show data/assets/ PNGs as untracked files",
-        "make lint passes"
+        "src/rag/embeddings/indexer.py exists with RAGIndexer class",
+        "RAGIndexer.__init__ reads QDRANT_PATH and EMBEDDING_MODEL from env with defaults (data/qdrant_db and text-embedding-3-large)",
+        "build_text_index(docs: list[Document]) creates text_documents collection in Qdrant using OpenAIEmbedding(model=EMBEDDING_MODEL)",
+        "Documents passed directly to VectorStoreIndex without additional splitting — ingest.py handles pre-chunking (20-row CSV windows, single-doc contracts/config)",
+        "Clean rebuild: drops and recreates text_documents collection on each run — no duplicate vectors",
+        "Typecheck passes"
       ],
       "priority": 2,
       "passes": false,
-      "notes": ""
+      "notes": "CRITICAL: Do NOT apply SentenceSplitter — it breaks tabular structure. Pass pre-chunked docs directly to VectorStoreIndex."
     },
     {
       "id": "US-003",
-      "title": "Create aggregate_mmm re-export module",
-      "description": "As a developer, I want the MMM aggregation step to run successfully so that generate_all.py completes all steps without skipping any.",
+      "title": "RAGIndexer — BM25 index",
+      "description": "As a retrieval engineer, I want a BM25 index built and persisted so that lexical retrieval is available for hybrid search.",
       "acceptanceCriteria": [
-        "data/generators/aggregate_mmm.py exists and re-exports aggregate_mmm_data from data/generators/validators.py",
-        "Module is importable via importlib.import_module('data.generators.aggregate_mmm')",
-        "Running python3 data/generators/generate_all.py shows MMM aggregation step as OK instead of SKIPPED",
-        "MMM output files in data/mmm/ are correctly generated (model_ready.csv, weekly_channel_spend.csv, weekly_sales.csv — 52 rows each)",
-        "make lint passes"
+        "build_bm25_index(docs: list[Document]) method added to RAGIndexer",
+        "Uses llama-index-retrievers-bm25 (NOT rank-bm25 raw library)",
+        "BM25 artifacts persisted to data/index/bm25/ directory",
+        "data/index/bm25/ is non-empty after indexing",
+        "BM25 index loadable without rebuild on second call",
+        "Typecheck passes"
       ],
       "priority": 3,
+      "passes": false,
+      "notes": "Use llama-index-retrievers-bm25, which is the LlamaIndex integration wrapper."
+    },
+    {
+      "id": "US-004",
+      "title": "RAGIndexer — campaign_assets collection and cost estimation",
+      "description": "As a campaign analyst, I want asset descriptions indexed in Qdrant and a cost estimator so I can search creatives and plan API spend.",
+      "acceptanceCriteria": [
+        "build_asset_index(docs: list[Document]) creates campaign_assets collection in Qdrant with same embedding model",
+        "campaign_assets collection contains >0 vectors after indexing",
+        "Asset metadata includes image_path field for later retrieval",
+        "estimate(docs: list[Document]) returns dict with chunk_count, estimated_tokens, estimated_cost_usd without calling the OpenAI API",
+        "Cost model uses text-embedding-3-large pricing ($0.13/1M tokens)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-004",
-      "title": "Fix spend verification column filter in generate_all.py",
-      "description": "As a developer, I want the spend verification to accurately report budget deviation so that I can trust the validation output.",
+      "id": "US-005",
+      "title": "build_index.py CLI with dry-run and cost guard",
+      "description": "As a developer, I want a CLI that can estimate costs, limit spend, and build indexes incrementally so I can test safely.",
       "acceptanceCriteria": [
-        "Spend verification loop in generate_all.py (lines 270-283) scans only data/raw/ directory, not data/mmm/",
-        "competitor_spend.csv is excluded from the spend sum",
-        "Column filter matches exact column name 'spend' (c.lower() == 'spend') instead of requiring both 'spend' and 'gbp'",
-        "After fix, reported spend deviation is < 5% with status OK",
-        "Full pipeline python3 data/generators/generate_all.py completes with all 10 validations passing",
-        "make lint passes"
+        "src/rag/data_processing/build_index.py exists and runnable as: python -m src.rag.data_processing.build_index",
+        "--dry-run: loads and chunks documents, prints estimate (doc count, chunk count, tokens, cost), exits without calling OpenAI",
+        "--max-cost-usd <float>: aborts with clear message if estimated cost exceeds cap",
+        "--text: builds text_documents collection + BM25 index only",
+        "--assets: builds campaign_assets collection only",
+        "--check: prints collection stats (name, vector count, status) and BM25 index status without mutation",
+        "--sample: loads 1 file per data category instead of all files (6 predefined files: meta_ads.csv, tv_performance.csv, vehicle_sales.csv, MediaAgency_Terms_of_Business.md, config.py, asset_manifest.csv)",
+        "No flags defaults to full build (text + assets, all files)",
+        "Help text (--help) documents all flags",
+        "Typecheck passes"
       ],
-      "priority": 4,
+      "priority": 5,
+      "passes": false,
+      "notes": "Sample files: meta_ads.csv (digital), tv_performance.csv (traditional), vehicle_sales.csv (sales), MediaAgency_Terms_of_Business.md (contract), config.py (config), asset_manifest.csv (assets)."
+    },
+    {
+      "id": "US-006",
+      "title": "search_text() with hybrid retrieval",
+      "description": "As a query consumer, I want hybrid text search combining dense vectors and BM25 lexical matching with reciprocal reranking so retrieval is strong for both semantic and keyword-heavy questions.",
+      "acceptanceCriteria": [
+        "src/rag/retrieval/query_engine.py exists",
+        "search_text(query: str, top_k: int = 5, category: str | None = None) function",
+        "search_text uses QueryFusionRetriever over Qdrant vector retriever + BM25 retriever",
+        "search_text applies reciprocal reranking and returns ranked list of nodes",
+        "Each returned node has score, text, and metadata (including source_file, category)",
+        "Smoke test: query 'What is Meta CPM?' returns nodes citing meta_ads.csv or config.py in top-5",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Uses QueryFusionRetriever with reciprocal reranking per LlamaIndex Production RAG docs."
+    },
+    {
+      "id": "US-007",
+      "title": "search_assets() and check_indexes()",
+      "description": "As a campaign analyst and operator, I want asset search and index health checks so I can locate creatives and verify index status.",
+      "acceptanceCriteria": [
+        "search_assets(query: str, top_k: int = 5, channel: str | None = None) function in query_engine.py",
+        "search_assets queries campaign_assets collection and returns nodes with image_path metadata",
+        "search_assets handles unknown channels gracefully without crashing",
+        "check_indexes() prints collection stats (name, vector_count, status) without mutating indexes",
+        "Smoke test: query 'DEEPAL S07 launch creative' returns nodes with valid image_path metadata",
+        "Typecheck passes"
+      ],
+      "priority": 7,
       "passes": false,
       "notes": ""
     }
