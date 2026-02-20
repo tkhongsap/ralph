@@ -1,183 +1,69 @@
 {
-  "project": "Raw Data Dashboard",
-  "branchName": "ralph/dashboard-visual-redesign",
-  "description": "Visual redesign of the Raw Data Inventory Dashboard to a premium dark-mode developer tool aesthetic. The FastAPI backend (src/platform/api/main.py, data_profiles.py) and check engine are fully implemented and working — all 4 API endpoints return correct data. This PRD covers frontend-only work: redesigning the React UI in ui/raw-data-dashboard/ to match the design spec in docs/prd/raw-data-dashboard-prd-detailed.md (Section 6). Key targets: dark-mode color system, CSS custom properties, skeleton loading, JetBrains Mono for data, and component-level redesigns for summary cards, tables, preview panel, and new interactive features (filter, expandable profiles, row-count selector).",
+  "project": "rag-mmm-platform",
+  "branchName": "ralph/ms1-synthetic-data-foundation",
+  "description": "MS-1 Synthetic Data & Mock Assets Foundation - Close 4 remaining gaps so generate_all.py runs cleanly end-to-end",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Design system foundation",
-      "description": "As a developer, I need a CSS design system with dark-mode tokens, font imports, and base component styles so that all subsequent UI stories share a consistent visual language.",
+      "title": "Add missing Python dependencies to requirements.txt",
+      "description": "As a developer, I need all required packages declared in requirements.txt so that a fresh pip install succeeds and the full pipeline runs.",
       "acceptanceCriteria": [
-        "index.html imports JetBrains Mono from Google Fonts CDN with monospace fallback",
-        "styles.css defines CSS custom properties in :root for all design tokens: --bg-base (#0f172a), --bg-card (#1e293b), --bg-card-hover (#334155), --text-primary (#f1f5f9), --text-secondary (#94a3b8), --text-muted (#64748b), --border (#334155), --accent (#6366f1), --pass (#10b981), --pass-bg (rgba(16,185,129,0.1)), --warn (#f59e0b), --warn-bg (rgba(245,158,11,0.1)), --fail (#f43f5e), --fail-bg (rgba(244,63,94,0.1))",
-        "body uses --bg-base background and --text-primary color; no light-mode gradient remains",
-        ".card class uses --bg-card background, 1px solid --border, border-radius 12px, padding 16-24px",
-        ".pill class uses rounded-full style with background+text color pairs for pass/warn/fail using the CSS variables",
-        "A .skeleton class is defined: animated pulse placeholder with --bg-card-hover background, border-radius 8px, suitable for loading states",
-        "All existing text and table elements use --text-primary or --text-secondary (no hardcoded light-mode colors remain in styles.css)",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
+        "Pillow>=10.0.0 added to requirements.txt (required by data/generators/assets.py:18 for PNG generation)",
+        "qdrant-client>=1.9.0 added to requirements.txt (vector store client, MS-2 prep)",
+        "llama-index-vector-stores-qdrant>=0.3.0 added to requirements.txt (LlamaIndex Qdrant integration, MS-2 prep)",
+        "pip install -r requirements.txt completes without errors",
+        "make lint passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "Files to modify: ui/raw-data-dashboard/index.html (add font link), ui/raw-data-dashboard/src/styles.css (rewrite with CSS variables). The current styles.css is 159 lines with hardcoded light-mode colors (#f4f7ff background, #1f2a44 text, #fff cards). Replace ALL color values with CSS custom properties. Keep existing layout rules (grid, flex) but update colors. The skeleton class should use @keyframes pulse animation (opacity 0.4 to 1 and back). Use the frontend-design skill for implementation."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Header, layout shell, and loading/error states",
-      "description": "As a developer viewing the dashboard, I want a polished header bar, proper layout structure, skeleton loading placeholders during data fetch, and styled error/empty states so that the app feels premium from first paint.",
+      "title": "Add .gitignore entries for generated assets and databases",
+      "description": "As a developer, I want generated binary files excluded from git tracking so that PNGs and database files don't bloat the repository.",
       "acceptanceCriteria": [
-        "Header bar shows title 'Raw Data Inventory' and subtitle 'Synthetic data readiness against PRD checks' with a subtle bottom border or shadow separator",
-        "Refresh button uses --accent color with hover state transition",
-        "While initial data is loading (before API response), summary card area shows 7 skeleton placeholder rectangles matching card dimensions",
-        "While loading, table areas show skeleton rows (at least 3 placeholder rows per table)",
-        "Error banner displays with --fail-bg background and --fail text when API call fails, replacing the plain red text",
-        "Empty state (no files) shows a centered muted message with an icon or illustration, not just plain text",
-        "Layout container uses max-width 1400px with comfortable padding",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
+        "data/assets/* added to .gitignore in the Data directories section",
+        "data/qdrant_db/ added to .gitignore",
+        "data/index/ added to .gitignore",
+        "Existing !data/**/.gitkeep pattern still works — .gitkeep files remain tracked",
+        "git status does not show data/assets/ PNGs as untracked files",
+        "make lint passes"
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Modify ui/raw-data-dashboard/src/App.jsx. The current App component has loading/error state variables already (lines 37-42). Replace the simple {loading && ...} conditionals with skeleton components. The error display is currently just <p className='error'>{error}</p> at line 116 — upgrade to a styled banner. Add a SkeletonCard and SkeletonRow component (can be inline in App.jsx). The refresh() function (line 44) already sets loading state correctly. Use the frontend-design skill for implementation."
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Summary cards redesign",
-      "description": "As a developer viewing the dashboard, I want the summary metric cards to have a premium dark-mode look with icon accents and clear visual hierarchy so that I can assess data readiness at a glance.",
+      "title": "Create aggregate_mmm re-export module",
+      "description": "As a developer, I want the MMM aggregation step to run successfully so that generate_all.py completes all steps without skipping any.",
       "acceptanceCriteria": [
-        "SummaryCard component displays: small muted label on top, large bold value below, with clear size hierarchy (label ~0.75rem, value ~1.5-1.8rem)",
-        "Each card has a subtle left-side colored accent bar or icon that differentiates card types",
-        "Cards use --bg-card background with --border, and hover state with slight elevation or brightness change",
-        "7 cards display: Total Files, CSV Files, Total Rows (locale-formatted), Total Size (human-readable), Checks Passing (count/total + percentage), Checks Warn + Fail counts, Last Scan timestamp",
-        "Cards grid is responsive: 4 columns on wide screens, 2 columns on medium, stacked on narrow (<768px)",
-        "Cards show '0' values (not errors or blanks) when data/raw/ is empty",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
+        "data/generators/aggregate_mmm.py exists and re-exports aggregate_mmm_data from data/generators/validators.py",
+        "Module is importable via importlib.import_module('data.generators.aggregate_mmm')",
+        "Running python3 data/generators/generate_all.py shows MMM aggregation step as OK instead of SKIPPED",
+        "MMM output files in data/mmm/ are correctly generated (model_ready.csv, weekly_channel_spend.csv, weekly_sales.csv — 52 rows each)",
+        "make lint passes"
       ],
       "priority": 3,
       "passes": false,
-      "notes": "Modify the SummaryCard component in App.jsx (currently lines 27-34). The current implementation is minimal: just a label and value. The summary data comes from payload.summary with fields: total_files, csv_files, total_rows, total_size_bytes, scanned_at. Check counts are computed via useMemo at lines 99-102. formatBytes() at line 4 and formatDate() at line 17 handle formatting. Use the frontend-design skill for implementation."
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "File inventory table redesign",
-      "description": "As a developer viewing the dashboard, I want the file inventory table redesigned with dark-mode styling, alternating row backgrounds, and clear row selection so that I can quickly scan the data inventory.",
+      "title": "Fix spend verification column filter in generate_all.py",
+      "description": "As a developer, I want the spend verification to accurately report budget deviation so that I can trust the validation output.",
       "acceptanceCriteria": [
-        "Table has dark-mode styling: --bg-card background, --border for cell borders, --text-primary for content",
-        "Table header row uses slightly lighter background (--bg-card-hover) with --text-secondary for header text, uppercase or small-caps style",
-        "Alternating row backgrounds using --bg-card and a slightly lighter variant for zebra striping",
-        "Selected row has a visible --accent left border or background tint, clearly distinguishable from hover",
-        "Hover state on non-selected rows shows --bg-card-hover",
-        "Table columns: File, Rows, Columns, Size, Modified, Null Ratio, Type — all present and readable",
-        "CSV files show numeric Rows/Columns; non-CSV shows 'n/a' in --text-muted color",
-        "File names use monospace font (JetBrains Mono)",
-        "Table renders empty state message when no files exist",
-        "Clicking a row selects it and triggers file preview (existing behavior preserved)",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
+        "Spend verification loop in generate_all.py (lines 270-283) scans only data/raw/ directory, not data/mmm/",
+        "competitor_spend.csv is excluded from the spend sum",
+        "Column filter matches exact column name 'spend' (c.lower() == 'spend') instead of requiring both 'spend' and 'gbp'",
+        "After fix, reported spend deviation is < 5% with status OK",
+        "Full pipeline python3 data/generators/generate_all.py completes with all 10 validations passing",
+        "make lint passes"
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Modify the Data Files table section in App.jsx (lines 128-166) and table styles in styles.css. The current table uses light-mode colors (#e7ecff borders, #f7faff hover, #e9efff selected). The file data comes from payload.files array, each object has: file_name, file_size_bytes, last_modified, is_csv, rows, columns, overall_missing_ratio. Row click sets selectedFile state (line 151). Use the frontend-design skill for implementation."
-    },
-    {
-      "id": "US-005",
-      "title": "PRD conformance table redesign",
-      "description": "As a developer viewing the dashboard, I want the PRD conformance check table redesigned with dark-mode styling and improved status pills so that I can quickly identify failing checks.",
-      "acceptanceCriteria": [
-        "Table uses same dark-mode styling as file inventory table (consistent header, borders, alternating rows)",
-        "Status pills are full rounded badges: pass uses --pass text on --pass-bg, warn uses --warn on --warn-bg, fail uses --fail on --fail-bg",
-        "Status pills have consistent width/padding so they align visually in the column",
-        "Table columns: Status, Check, File, Observed, Expected, Details — all present",
-        "Observed and Expected columns use monospace font and truncate long values with ellipsis (hoverable for full text, or wrapped in scrollable pre)",
-        "File column uses monospace font",
-        "Failed checks are visually prominent — fail rows may have a subtle --fail-bg tinted background",
-        "Empty state message shown when no checks exist",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 5,
-      "passes": false,
-      "notes": "Modify the PRD Conformance table in App.jsx (lines 168-200) and .pill styles in styles.css. The current StatusPill component (lines 22-25) just adds a class — keep the component, update styling. Check data comes from payload.checks array, each object has: id, title, file, status (pass/warn/fail), observed, expected, details. The check key is `${check.file}-${check.id}` (line 184). Use the frontend-design skill for implementation."
-    },
-    {
-      "id": "US-006",
-      "title": "File preview panel redesign",
-      "description": "As a developer viewing the dashboard, I want the file preview panel redesigned with dark-mode styling, proper code formatting, and clear loading/empty states so that I can inspect file contents comfortably.",
-      "acceptanceCriteria": [
-        "Preview panel uses --bg-card background with --border and sits below the tables",
-        "Panel heading 'File Preview' and source file name use clear typography hierarchy",
-        "CSV preview data renders in a formatted code block with monospace font (JetBrains Mono), syntax-highlighted or at minimum with proper indentation",
-        "Non-CSV file content (markdown contracts) renders as preformatted text with monospace font",
-        "Loading state shows 'Loading preview...' with a subtle animation or skeleton, not plain text",
-        "Error state shows styled error message with --fail-bg background",
-        "Empty state ('Select a file...') shows centered muted text",
-        "Code block has a subtle different background (slightly lighter/darker than card) with rounded corners and padding",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 6,
-      "passes": false,
-      "notes": "Modify the File Preview section in App.jsx (lines 202-219) and pre/code styles in styles.css. The preview data comes from the getFilePreview() API call in the useEffect at line 64. Preview response has: file_name, rows, columns, preview_rows (array of row objects) for CSVs, or text content for non-CSV. The current rendering uses JSON.stringify(preview?.preview_rows ?? [], null, 2) at line 213. Use the frontend-design skill for implementation."
-    },
-    {
-      "id": "US-007",
-      "title": "Check filter dropdown with count badges",
-      "description": "As a developer viewing the dashboard, I want to filter the PRD conformance table by check status (All/Pass/Warn/Fail) with count badges so that I can focus on failing checks during triage.",
-      "acceptanceCriteria": [
-        "A filter control appears above or inline with the PRD conformance table heading",
-        "Filter options: All, Pass, Warn, Fail — implemented as buttons or a dropdown",
-        "Each option shows a count badge (e.g., 'Fail (3)', 'Pass (58)', 'All (62)')",
-        "Selecting a filter immediately hides non-matching check rows; 'All' shows everything",
-        "Active filter option is visually highlighted with --accent color",
-        "Filter state is managed via React useState (new state variable)",
-        "Count badges update when data refreshes",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 7,
-      "passes": false,
-      "notes": "Add new state: const [checkFilter, setCheckFilter] = useState('all'). Compute filtered checks with useMemo: filter payload.checks by status when checkFilter !== 'all'. The pass/warn/fail counts are already computed at lines 99-101 (passing, warn, fail variables). Render filter buttons above the PRD Conformance table heading. Apply filter to the checks.map() at line 183. Use the frontend-design skill for implementation."
-    },
-    {
-      "id": "US-008",
-      "title": "Expandable column profiles in file inventory",
-      "description": "As a developer viewing the dashboard, I want to expand CSV file rows in the inventory table to see column-level profiles (dtype, null count, distinct count, min/max) so that I can inspect data quality per column.",
-      "acceptanceCriteria": [
-        "Each CSV file row has an expand/collapse chevron icon (right-pointing when collapsed, down when expanded)",
-        "Non-CSV file rows do NOT show the expand toggle",
-        "Clicking the chevron toggles a sub-row below the file row containing a nested column profiles table",
-        "Column profiles sub-table shows: Column Name, Dtype, Null Count, Null Ratio (%), Distinct Count, Min, Max, Sample Values",
-        "Sub-table uses slightly indented layout or different background shade to distinguish from main table",
-        "Sub-table data comes from the file object's column_profiles array (already returned by the API)",
-        "Multiple rows can be expanded simultaneously",
-        "Expand state is managed via React useState (Set or array of expanded file names)",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 8,
-      "passes": false,
-      "notes": "Add new state: const [expandedFiles, setExpandedFiles] = useState(new Set()). The API already returns column_profiles in each file object. Each column_profiles entry has: column_name, dtype, null_count, null_ratio, distinct_count, min, max, sample_values. In the files.map() block (line 145), add a toggle button in the first cell and render a conditional <tr> with colSpan={7} containing the sub-table when expanded. Be careful to separate the expand click from the row selection click — use stopPropagation on the chevron button. Use the frontend-design skill for implementation."
-    },
-    {
-      "id": "US-009",
-      "title": "Row-count selector and cross-file check badge",
-      "description": "As a developer viewing the dashboard, I want a row-count dropdown in the preview panel and a cross-file badge on relevant PRD checks so that I can control preview depth and distinguish check types.",
-      "acceptanceCriteria": [
-        "Preview panel includes a row-count dropdown with options: 10, 20, 50, 100 (default 20)",
-        "Dropdown is styled consistently with the dark-mode design system (--bg-card-hover background, --border, --text-primary)",
-        "Changing the dropdown value triggers a new API call to getFilePreview(fileName, newRowCount)",
-        "Row count state is managed via React useState",
-        "Cross-file checks in the PRD conformance table display a small 'cross-file' badge next to the check title",
-        "Cross-file badge uses a distinct muted style (e.g., --text-muted color, small rounded pill with subtle border)",
-        "Cross-file checks are identified by checking if check.file contains multiple files or if check.id starts with 'cross' (match the API response pattern)",
-        "npm run build passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": "Two features paired here. (1) Row-count: Add state const [previewRows, setPreviewRows] = useState(20). Update the getFilePreview call in useEffect (line 74) to use previewRows instead of hardcoded 20. Add previewRows to the useEffect dependency array. The api.js getFilePreview() already accepts a rows parameter. Render a <select> in the preview panel header next to 'File Preview'. (2) Cross-file badge: In the API response, cross-file checks have check.file set to values like 'dealer_locations.csv → vehicle_sales.csv' (contains '→' or similar multi-file indicator) or the check id contains 'cross_file'. Inspect the actual API response to determine the pattern, then conditionally render a small badge. Use the frontend-design skill for implementation."
+      "notes": ""
     }
   ]
 }
